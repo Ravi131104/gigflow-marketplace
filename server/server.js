@@ -20,7 +20,8 @@ dotenv.config();
 const server = http.createServer(app);
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://gigflow-marketplace.vercel.app" // <--- PASTE YOUR VERCEL LINK HERE
+  "https://gigflow-marketplace.vercel.app",
+  "https://gigflow-marketplace-liard.vercel.app" // <--- PASTE YOUR VERCEL LINK HERE
 ];
 const io = new Server(server, {
   cors: {
