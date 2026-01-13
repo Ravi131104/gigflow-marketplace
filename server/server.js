@@ -18,9 +18,13 @@ dotenv.config();
 
 // 2. Create HTTP Server & Socket.io Instance
 const server = http.createServer(app);
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://gigflow-marketplace.vercel.app" // <--- PASTE YOUR VERCEL LINK HERE
+];
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // URL of your React Client
+    origin: allowedOrigins, // URL of your React Client
     methods: ["GET", "POST", "PATCH"],
     credentials: true, // Allow cookies to be sent
   },
@@ -62,7 +66,7 @@ app.set('onlineUsers', onlineUsers);
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: allowedOrigins,
   credentials: true,
 }));
 
