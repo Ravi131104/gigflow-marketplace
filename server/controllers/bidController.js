@@ -1,5 +1,5 @@
-const Bid = require('../models/Bid');
-const Gig = require('../models/Gig');
+const Bid = require('../models/bid');
+const Gig = require('../models/gig');
 
 // 1. ADD BID (With Edge Case Checks)
 const addBid = async (req, res, next) => {

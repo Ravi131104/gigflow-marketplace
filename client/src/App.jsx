@@ -19,7 +19,8 @@ function App() {
   useEffect(() => {
     // Only connect if a user is logged in
     if (currentUser) {
-      const socket = io("http://localhost:8800");
+
+      const socket = io(import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:8800");
 
       // A. Send identity to server so it knows where to send notifications
       const userId = currentUser.id || currentUser._id;

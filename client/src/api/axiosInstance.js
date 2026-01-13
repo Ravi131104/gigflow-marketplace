@@ -1,8 +1,9 @@
 import axios from "axios";
 
 const newRequest = axios.create({
-  baseURL: "http://localhost:8800/api",
-  withCredentials: true, // IMPORTANT: Allows cookies to be sent/received
+  // If we are in production, use the environment variable. Otherwise, localhost.
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8800/api",
+  withCredentials: true,
 });
 
 export default newRequest;
