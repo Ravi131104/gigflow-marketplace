@@ -1,4 +1,4 @@
-const Gig = require("../models/Gig");
+const Gig = require("../models/gig");
 
 const createGig = async (req, res, next) => {
   try {
