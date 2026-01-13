@@ -16,7 +16,15 @@ const Login = () => {
     dispatch(loginStart());
     try {
       const res = await newRequest.post("/auth/login", { email, password });
+      
+      // FIX 1: Save to Local Storage (Crucial for persistence)
+      // This ensures you stay logged in if you refresh the page
+      localStorage.setItem("currentUser", JSON.stringify(res.data));
+
+      // FIX 2: Correct Data Access
+      // The backend returns the user directly in 'res.data', not 'res.data.user'
       dispatch(loginSuccess(res.data.user));
+      
       navigate("/");
     } catch (err) {
       dispatch(loginFailure());
