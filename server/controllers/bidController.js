@@ -1,8 +1,5 @@
-const Bid = require("../models/bid");
+const Bid = require("../models/bid"); // Ensure capitalization matches (Bid.js vs bid.js)
 const Gig = require("../models/gig");
-// ✅ NEW IMPORTS: Required for the automatic message feature
-const Conversation = require("../models/conversation"); 
-const Message = require("../models/message");
 
 // 1. ADD BID
 const addBid = async (req, res, next) => {
@@ -37,11 +34,10 @@ const addBid = async (req, res, next) => {
   }
 };
 
-// 2. HIRE FREELANCER (Updated with Messaging)
+// 2. HIRE FREELANCER (With Real-Time Socket.io Notification)
 const hireFreelancer = async (req, res, next) => {
   const { bidId } = req.params;
   const { gigId } = req.body; 
-  const employerId = req.userId; // We need the Employer's ID to send the message
 
   try {
     // A. LOCK GIG
@@ -68,49 +64,32 @@ const hireFreelancer = async (req, res, next) => {
       { status: 'rejected' }
     );
 
-    // --- D. SEND AUTOMATIC CONGRATULATIONS MESSAGE ---
-    try {
-      const freelancerId = winningBid.freelancerId.toString();
-      
-      // 1. Generate Unique Conversation ID (Standard: sellerId + buyerId)
-      // Note: Ensure this ID generation logic matches your conversation.controller.js logic
-      // Usually, it is safe to sort them to ensure uniqueness regardless of who initiated.
-      // Or, we follow your app's convention (Seller + Buyer).
-      // Assuming Freelancer = Seller, Employer = Buyer
-      const conversationId = freelancerId + employerId; 
+    // --- D. REAL-TIME SOCKET NOTIFICATION ---
+    // 1. Get the Socket.io instance and online users list from the app settings
+    // (This works because we did app.set('onlineUsers', ...) in server.js)
+    const io = req.app.get("socketio");
+    const onlineUsers = req.app.get("onlineUsers") || [];
 
-      // 2. Create or Update the Conversation
-      await Conversation.findOneAndUpdate(
-        { id: conversationId },
-        {
-          $set: {
-            id: conversationId,
-            sellerId: freelancerId,
-            buyerId: employerId,
-            readBySeller: false, // Mark unread for freelancer
-            readByBuyer: true,
-            lastMessage: `🎉 YOU'RE HIRED: ${gig.title}`,
-          },
-        },
-        { upsert: true, new: true }
-      );
+    // 2. Find the Freelancer in the onlineUsers array
+    // We compare strings to ensure safety
+    const freelancerSocket = onlineUsers.find(
+      (user) => user.userId === winningBid.freelancerId.toString()
+    );
 
-      // 3. Create the Message Object
-      const newMessage = new Message({
-        conversationId: conversationId,
-        userId: employerId, // Message is FROM the Employer
-        desc: `🎉 Congratulations! I have accepted your proposal for "${gig.title}". Let's get started!`,
+    // 3. If they are online, send the alert specifically to their socket ID
+    if (freelancerSocket && io) {
+      io.to(freelancerSocket.socketId).emit("notification", {
+        type: "hired",
+        message: `🎉 You have been hired for "${gig.title}"!`,
+        gigId: gig._id,
       });
-      
-      await newMessage.save();
-
-    } catch (msgErr) {
-      console.log("Auto-message failed (non-critical):", msgErr);
-      // We log the error but do NOT fail the hiring request.
+      console.log(`Socket notification sent to ${freelancerSocket.userId} (Socket ID: ${freelancerSocket.socketId})`);
+    } else {
+        console.log("Freelancer is offline or socket not found, notification skipped.");
     }
-    // ---------------------------------------------------
+    // ----------------------------------------
 
-    res.status(200).json({ message: "Freelancer hired & notified!", winningBid });
+    res.status(200).json({ message: "Freelancer hired successfully!", winningBid });
   } catch (err) {
     next(err);
   }
