@@ -17,18 +17,23 @@ const Login = () => {
     try {
       const res = await newRequest.post("/auth/login", { email, password });
       
-      // FIX 1: Save to Local Storage (Crucial for persistence)
-      // This ensures you stay logged in if you refresh the page
+      // --- DEBUGGING LOGS (Check your browser console!) ---
+      console.log("LOGIN RESPONSE:", res.data); 
+      
+      // --- THE FIX ---
+      // ❌ OLD ERROR: dispatch(loginSuccess(res.data.user)); 
+      // ✅ CORRECT: res.data IS the user object.
+      
+      dispatch(loginSuccess(res.data)); 
+      
+      // Save to local storage correctly
       localStorage.setItem("currentUser", JSON.stringify(res.data));
-
-      // FIX 2: Correct Data Access
-      // The backend returns the user directly in 'res.data', not 'res.data.user'
-      dispatch(loginSuccess(res.data.user));
       
       navigate("/");
     } catch (err) {
       dispatch(loginFailure());
       setError(err.response?.data?.message || "Login failed!");
+      console.error("LOGIN ERROR:", err);
     }
   };
 
