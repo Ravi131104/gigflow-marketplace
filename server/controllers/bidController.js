@@ -24,7 +24,8 @@ const addBid = async (req, res, next) => {
       freelancerId,
       price,
       message,
-      status: 'Pending'
+      // ⚠️ FIX: Changed 'Pending' to 'pending' (lowercase)
+      status: 'pending' 
     });
 
     await newBid.save();
@@ -36,11 +37,10 @@ const addBid = async (req, res, next) => {
 
 // 2. HIRE FREELANCER
 const hireFreelancer = async (req, res, next) => {
-  const { bidId } = req.params; // Matches the route parameter /:bidId/hire
+  const { bidId } = req.params;
   const { gigId } = req.body; 
 
   try {
-    // A. LOCK GIG
     const gig = await Gig.findOneAndUpdate(
       { _id: gigId, status: "Open" }, 
       { $set: { status: "Assigned" } }, 
@@ -51,17 +51,17 @@ const hireFreelancer = async (req, res, next) => {
       return res.status(400).json("This gig is already assigned or closed!");
     }
 
-    // B. UPDATE WINNING BID
+    // ⚠️ FIX: Changed 'Hired' to 'hired' (lowercase)
     const winningBid = await Bid.findByIdAndUpdate(
       bidId,
-      { status: 'Hired' },
+      { status: 'hired' },
       { new: true }
     );
 
-    // C. REJECT OTHERS
+    // ⚠️ FIX: Changed 'Rejected' to 'rejected' (lowercase)
     await Bid.updateMany(
       { gigId: gigId, _id: { $ne: bidId } }, 
-      { status: 'Rejected' }
+      { status: 'rejected' }
     );
 
     res.status(200).json({ message: "Freelancer hired successfully!", winningBid });
