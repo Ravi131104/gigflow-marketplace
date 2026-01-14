@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
-import newRequest from "../../utils/newRequest"; 
+
+import newRequest from "../api/axiosInstance"; 
+
 import { useSelector } from "react-redux";
+// ... rest of imports
 import { useNavigate } from "react-router-dom";
 import { FiBriefcase, FiMessageSquare, FiUser } from "react-icons/fi";
 
