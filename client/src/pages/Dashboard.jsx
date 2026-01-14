@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import newRequest from "../../utils/newRequest"; 
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { FiBriefcase, FiDollarSign, FiMessageSquare, FiUser } from "react-icons/fi";
+// FIX: Removed unused 'FiDollarSign' to prevent Build Failure
+import { FiBriefcase, FiMessageSquare, FiUser } from "react-icons/fi";
 
 const Dashboard = () => {
   const { currentUser } = useSelector((state) => state.user);
@@ -37,18 +38,14 @@ const Dashboard = () => {
     } catch (err) { alert("Could not fetch bids."); }
   };
 
-  // --- ✅ FIXED FUNCTION ---
   const handleHire = async (bidId, gigId) => {
     if(!window.confirm("Hire this freelancer? This will reject all other bids.")) return;
     try {
-      // FIX 1: Use .patch (Matches the Backend)
-      // FIX 2: Use URL /bids/:bidId/hire (ID comes FIRST)
       await newRequest.patch(`/bids/${bidId}/hire`, { gigId });
-      
       alert("Freelancer hired successfully!");
       window.location.reload(); 
     } catch (err) {
-      console.error("Hiring Error:", err); // Log the real error to console
+      console.error("Hiring Error:", err);
       alert(err.response?.data?.message || err.response?.data || "Hiring failed");
     }
   };
@@ -129,7 +126,6 @@ const Dashboard = () => {
                     "{bid.message}"
                   </div>
 
-                  {/* ONLY SHOW BUTTON IF STATUS IS PENDING */}
                   {(bid.status !== 'Hired' && bid.status !== 'Rejected') && (
                     <div className="flex justify-end pt-2">
                       <button 
