@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import newRequest from "../../utils/newRequest"; 
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-// FIX: Removed unused 'FiDollarSign' to prevent Build Failure
 import { FiBriefcase, FiMessageSquare, FiUser } from "react-icons/fi";
 
 const Dashboard = () => {
@@ -38,12 +37,32 @@ const Dashboard = () => {
     } catch (err) { alert("Could not fetch bids."); }
   };
 
-  const handleHire = async (bidId, gigId) => {
+  // --- ✅ FIXED: NO RELOAD STRATEGY ---
+  const handleHire = async (e, bidId, gigId) => {
+    e.preventDefault(); // 1. Stop form submission
+    e.stopPropagation(); // 2. Stop event bubbling
+
     if(!window.confirm("Hire this freelancer? This will reject all other bids.")) return;
+    
     try {
       await newRequest.patch(`/bids/${bidId}/hire`, { gigId });
+      
+      // 3. Update Gigs List Manually (Mark as Assigned)
+      setMyGigs((prev) => prev.map(gig => 
+        gig._id === gigId ? { ...gig, status: "Assigned" } : gig
+      ));
+
+      // 4. Update Bids List Manually (Mark Hired/Rejected)
+      // Note: We use lowercase 'hired'/'rejected' to match your Backend Controller
+      setSelectedGigBids((prev) => prev.map(bid => {
+        if (bid._id === bidId) return { ...bid, status: "hired" };
+        return { ...bid, status: "rejected" };
+      }));
+
       alert("Freelancer hired successfully!");
-      window.location.reload(); 
+      
+      // ❌ DELETED: window.location.reload(); (This caused the 404 crash)
+      
     } catch (err) {
       console.error("Hiring Error:", err);
       alert(err.response?.data?.message || err.response?.data || "Hiring failed");
@@ -114,7 +133,8 @@ const Dashboard = () => {
                     <div className="text-right">
                       <span className="block text-2xl font-extrabold text-emerald-600">${bid.price}</span>
                       <span className={`text-xs font-bold uppercase tracking-wider ${
-                        bid.status === 'Hired' ? 'text-green-600' : bid.status === 'Rejected' ? 'text-red-500' : 'text-yellow-600'
+                        // Matches backend lowercase 'hired'/'rejected'
+                        bid.status === 'hired' ? 'text-green-600' : bid.status === 'rejected' ? 'text-red-500' : 'text-yellow-600'
                       }`}>
                         {bid.status}
                       </span>
@@ -126,10 +146,13 @@ const Dashboard = () => {
                     "{bid.message}"
                   </div>
 
-                  {(bid.status !== 'Hired' && bid.status !== 'Rejected') && (
+                  {/* Button logic checks for 'hired'/'rejected' (lowercase) */}
+                  {(bid.status !== 'hired' && bid.status !== 'rejected') && (
                     <div className="flex justify-end pt-2">
                       <button 
-                        onClick={() => handleHire(bid._id, bid.gigId)} 
+                        // ✅ Pass 'e' to handleHire
+                        onClick={(e) => handleHire(e, bid._id, bid.gigId)}
+                        type="button" // ✅ Prevent form submission behavior
                         className="bg-black text-white px-6 py-2.5 rounded-lg font-bold hover:bg-gray-800 transition transform active:scale-95 shadow-lg"
                       >
                         Hire Applicant
