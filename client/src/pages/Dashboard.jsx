@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import newRequest from "../../utils/newRequest"; // Make sure path is correct
+import newRequest from "../../utils/newRequest"; 
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { FiBriefcase, FiDollarSign, FiMessageSquare, FiUser } from "react-icons/fi";
@@ -16,11 +16,10 @@ const Dashboard = () => {
     const fetchMyGigs = async () => {
       try {
         const res = await newRequest.get(`/gigs?search=`);
-        // Handle both id formats (_id or id) just in case
         const currentUserId = currentUser.id || currentUser._id;
         
         const userGigs = res.data.filter(gig => 
-            (gig.userId === currentUserId) || // Check direct userId field first
+            (gig.userId === currentUserId) || 
             (gig.ownerId?._id === currentUserId) || 
             (gig.ownerId === currentUserId)
         );
@@ -38,18 +37,18 @@ const Dashboard = () => {
     } catch (err) { alert("Could not fetch bids."); }
   };
 
-  // --- CRITICAL FIX HERE ---
+  // --- ✅ FIXED FUNCTION ---
   const handleHire = async (bidId, gigId) => {
     if(!window.confirm("Hire this freelancer? This will reject all other bids.")) return;
     try {
-      // 1. Method must be PUT (matches backend router.put)
-      // 2. URL must be /bids/hire/:bidId
-      // 3. Body must include gigId
-      await newRequest.put(`/bids/hire/${bidId}`, { gigId });
+      // FIX 1: Use .patch (Matches the Backend)
+      // FIX 2: Use URL /bids/:bidId/hire (ID comes FIRST)
+      await newRequest.patch(`/bids/${bidId}/hire`, { gigId });
       
       alert("Freelancer hired successfully!");
       window.location.reload(); 
     } catch (err) {
+      console.error("Hiring Error:", err); // Log the real error to console
       alert(err.response?.data?.message || err.response?.data || "Hiring failed");
     }
   };
@@ -111,7 +110,6 @@ const Dashboard = () => {
                         <FiUser size={20} />
                       </div>
                       <div>
-                        {/* Check if freelancerId exists before accessing name */}
                         <h4 className="font-bold text-gray-900 text-lg">{bid.freelancerId?.name || "Unknown User"}</h4>
                         <p className="text-sm text-gray-500">{bid.freelancerId?.email || "No Email"}</p>
                       </div>
@@ -131,7 +129,7 @@ const Dashboard = () => {
                     "{bid.message}"
                   </div>
 
-                  {/* ONLY SHOW BUTTON IF STATUS IS PENDING OR OPEN */}
+                  {/* ONLY SHOW BUTTON IF STATUS IS PENDING */}
                   {(bid.status !== 'Hired' && bid.status !== 'Rejected') && (
                     <div className="flex justify-end pt-2">
                       <button 
