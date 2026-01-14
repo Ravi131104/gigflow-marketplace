@@ -2,16 +2,14 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// 1. REGISTER (Updated to Auto-Login)
+// 1. REGISTER
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, isSeller } = req.body; // Added isSeller support if needed
+    const { name, email, password, isSeller } = req.body;
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create User
     const newUser = new User({
       name,
       email,
@@ -21,8 +19,6 @@ const register = async (req, res, next) => {
 
     const savedUser = await newUser.save();
 
-    // --- AUTO-LOGIN LOGIC START ---
-    // Generate Token immediately so they don't have to login again
     const token = jwt.sign(
       { id: savedUser._id, isSeller: savedUser.isSeller },
       process.env.JWT_SECRET,
@@ -34,19 +30,19 @@ const register = async (req, res, next) => {
     res
       .cookie("accessToken", token, {
         httpOnly: true,
-        secure: true,       // CRITICAL for Render/Vercel
-        sameSite: "none",   // CRITICAL for Cross-Origin
+        secure: true,
+        sameSite: "none",
       })
       .status(201)
-      .json(otherDetails);
-    // --- AUTO-LOGIN LOGIC END ---
+      // CHANGE: Send token in body too
+      .json({ ...otherDetails, token }); 
 
   } catch (err) {
     next(err);
   }
 };
 
-// 2. LOGIN (Fixed variable names & Cookie Security)
+// 2. LOGIN
 const login = async (req, res, next) => {
   try {
     const user = await User.findOne({ email: req.body.email });
@@ -61,24 +57,24 @@ const login = async (req, res, next) => {
       { expiresIn: "1d" }
     );
 
-    // Extract password to not send it back
     const { password, ...otherDetails } = user._doc;
 
     res
       .cookie("accessToken", token, {
         httpOnly: true,
-        secure: true,       // CRITICAL
-        sameSite: "none",   // CRITICAL
+        secure: true,
+        sameSite: "none",
       })
       .status(200)
-      .json(otherDetails); // Fixed: changed 'info' to 'otherDetails'
+      // CHANGE: Send token in body too
+      .json({ ...otherDetails, token });
 
   } catch (err) {
     next(err);
   }
 };
 
-// 3. LOGOUT (Must also use secure/sameSite to delete correctly)
+// 3. LOGOUT
 const logout = (req, res) => {
   res
     .clearCookie("accessToken", {
