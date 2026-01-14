@@ -1,5 +1,8 @@
 const Bid = require("../models/bid");
 const Gig = require("../models/gig");
+// ✅ NEW IMPORTS: Required for the automatic message feature
+const Conversation = require("../models/conversation"); 
+const Message = require("../models/message");
 
 // 1. ADD BID
 const addBid = async (req, res, next) => {
@@ -24,7 +27,6 @@ const addBid = async (req, res, next) => {
       freelancerId,
       price,
       message,
-      // ⚠️ FIX: Changed 'Pending' to 'pending' (lowercase)
       status: 'pending' 
     });
 
@@ -35,12 +37,14 @@ const addBid = async (req, res, next) => {
   }
 };
 
-// 2. HIRE FREELANCER
+// 2. HIRE FREELANCER (Updated with Messaging)
 const hireFreelancer = async (req, res, next) => {
   const { bidId } = req.params;
   const { gigId } = req.body; 
+  const employerId = req.userId; // We need the Employer's ID to send the message
 
   try {
+    // A. LOCK GIG
     const gig = await Gig.findOneAndUpdate(
       { _id: gigId, status: "Open" }, 
       { $set: { status: "Assigned" } }, 
@@ -51,20 +55,62 @@ const hireFreelancer = async (req, res, next) => {
       return res.status(400).json("This gig is already assigned or closed!");
     }
 
-    // ⚠️ FIX: Changed 'Hired' to 'hired' (lowercase)
+    // B. UPDATE WINNING BID
     const winningBid = await Bid.findByIdAndUpdate(
       bidId,
       { status: 'hired' },
       { new: true }
     );
 
-    // ⚠️ FIX: Changed 'Rejected' to 'rejected' (lowercase)
+    // C. REJECT OTHERS
     await Bid.updateMany(
       { gigId: gigId, _id: { $ne: bidId } }, 
       { status: 'rejected' }
     );
 
-    res.status(200).json({ message: "Freelancer hired successfully!", winningBid });
+    // --- D. SEND AUTOMATIC CONGRATULATIONS MESSAGE ---
+    try {
+      const freelancerId = winningBid.freelancerId.toString();
+      
+      // 1. Generate Unique Conversation ID (Standard: sellerId + buyerId)
+      // Note: Ensure this ID generation logic matches your conversation.controller.js logic
+      // Usually, it is safe to sort them to ensure uniqueness regardless of who initiated.
+      // Or, we follow your app's convention (Seller + Buyer).
+      // Assuming Freelancer = Seller, Employer = Buyer
+      const conversationId = freelancerId + employerId; 
+
+      // 2. Create or Update the Conversation
+      await Conversation.findOneAndUpdate(
+        { id: conversationId },
+        {
+          $set: {
+            id: conversationId,
+            sellerId: freelancerId,
+            buyerId: employerId,
+            readBySeller: false, // Mark unread for freelancer
+            readByBuyer: true,
+            lastMessage: `🎉 YOU'RE HIRED: ${gig.title}`,
+          },
+        },
+        { upsert: true, new: true }
+      );
+
+      // 3. Create the Message Object
+      const newMessage = new Message({
+        conversationId: conversationId,
+        userId: employerId, // Message is FROM the Employer
+        desc: `🎉 Congratulations! I have accepted your proposal for "${gig.title}". Let's get started!`,
+      });
+      
+      await newMessage.save();
+
+    } catch (msgErr) {
+      console.log("Auto-message failed (non-critical):", msgErr);
+      // We log the error but do NOT fail the hiring request.
+    }
+    // ---------------------------------------------------
+
+    res.status(200).json({ message: "Freelancer hired & notified!", winningBid });
   } catch (err) {
     next(err);
   }
