@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import newRequest from "../api/axiosInstance";
+import newRequest from "../../utils/newRequest"; // Make sure path is correct
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { FiBriefcase, FiDollarSign, FiMessageSquare, FiUser } from "react-icons/fi";
@@ -16,9 +16,12 @@ const Dashboard = () => {
     const fetchMyGigs = async () => {
       try {
         const res = await newRequest.get(`/gigs?search=`);
+        // Handle both id formats (_id or id) just in case
         const currentUserId = currentUser.id || currentUser._id;
+        
         const userGigs = res.data.filter(gig => 
-            (gig.ownerId._id === currentUserId) || 
+            (gig.userId === currentUserId) || // Check direct userId field first
+            (gig.ownerId?._id === currentUserId) || 
             (gig.ownerId === currentUserId)
         );
         setMyGigs(userGigs);
@@ -35,14 +38,19 @@ const Dashboard = () => {
     } catch (err) { alert("Could not fetch bids."); }
   };
 
+  // --- CRITICAL FIX HERE ---
   const handleHire = async (bidId, gigId) => {
-    if(!window.confirm("Hire this freelancer?")) return;
+    if(!window.confirm("Hire this freelancer? This will reject all other bids.")) return;
     try {
-      await newRequest.patch(`/bids/${bidId}/hire`, { gigId });
+      // 1. Method must be PUT (matches backend router.put)
+      // 2. URL must be /bids/hire/:bidId
+      // 3. Body must include gigId
+      await newRequest.put(`/bids/hire/${bidId}`, { gigId });
+      
       alert("Freelancer hired successfully!");
       window.location.reload(); 
     } catch (err) {
-      alert(err.response?.data?.message || "Hiring failed");
+      alert(err.response?.data?.message || err.response?.data || "Hiring failed");
     }
   };
 
@@ -72,7 +80,7 @@ const Dashboard = () => {
                     <span className={`px-2 py-0.5 rounded text-xs font-semibold ${gig.status === 'Open' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                       {gig.status}
                     </span>
-                    <span className="text-gray-500 font-medium">${gig.budget}</span>
+                    <span className="text-gray-500 font-medium">${gig.price}</span>
                   </div>
                 </div>
               ))}
@@ -103,14 +111,15 @@ const Dashboard = () => {
                         <FiUser size={20} />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 text-lg">{bid.freelancerId.name}</h4>
-                        <p className="text-sm text-gray-500">{bid.freelancerId.email}</p>
+                        {/* Check if freelancerId exists before accessing name */}
+                        <h4 className="font-bold text-gray-900 text-lg">{bid.freelancerId?.name || "Unknown User"}</h4>
+                        <p className="text-sm text-gray-500">{bid.freelancerId?.email || "No Email"}</p>
                       </div>
                     </div>
                     <div className="text-right">
                       <span className="block text-2xl font-extrabold text-emerald-600">${bid.price}</span>
                       <span className={`text-xs font-bold uppercase tracking-wider ${
-                        bid.status === 'hired' ? 'text-green-600' : bid.status === 'rejected' ? 'text-red-500' : 'text-yellow-600'
+                        bid.status === 'Hired' ? 'text-green-600' : bid.status === 'Rejected' ? 'text-red-500' : 'text-yellow-600'
                       }`}>
                         {bid.status}
                       </span>
@@ -122,7 +131,8 @@ const Dashboard = () => {
                     "{bid.message}"
                   </div>
 
-                  {bid.status === 'pending' && (
+                  {/* ONLY SHOW BUTTON IF STATUS IS PENDING OR OPEN */}
+                  {(bid.status !== 'Hired' && bid.status !== 'Rejected') && (
                     <div className="flex justify-end pt-2">
                       <button 
                         onClick={() => handleHire(bid._id, bid.gigId)} 

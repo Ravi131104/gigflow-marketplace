@@ -1,30 +1,25 @@
 const Bid = require('../models/bid');
 const Gig = require('../models/gig');
 
-// 1. ADD BID (With Edge Case Checks)
+// 1. ADD BID (With Validation)
 const addBid = async (req, res, next) => {
   try {
     const { gigId, price, message } = req.body;
-    const freelancerId = req.userId; // Coming from verifyToken middleware
+    const freelancerId = req.userId; // From verifyToken middleware
 
     // Check if Gig exists
     const gig = await Gig.findById(gigId);
     if (!gig) return res.status(404).json("Gig not found!");
 
-    // EDGE CASE 1: Prevent Self-Bidding
-    if (gig.ownerId.toString() === freelancerId) {
+    // Prevent Self-Bidding
+    if (gig.userId === freelancerId) {
       return res.status(403).json("You cannot bid on your own gig!");
     }
 
-    // EDGE CASE 2: Prevent Double Bidding
+    // Prevent Double Bidding
     const existingBid = await Bid.findOne({ gigId, freelancerId });
     if (existingBid) {
       return res.status(409).json("You have already placed a bid on this gig.");
-    }
-
-    // EDGE CASE 3: Prevent bidding on closed gigs
-    if (gig.status !== 'Open') {
-      return res.status(400).json("This gig is no longer accepting proposals.");
     }
 
     // Create Bid
@@ -42,52 +37,47 @@ const addBid = async (req, res, next) => {
   }
 };
 
-// 2. HIRE FREELANCER (Secure Atomic Version + Socket.io)
-const hireFreelancer = async (req, res) => {
+// 2. HIRE FREELANCER (Atomic & Secure)
+const hireFreelancer = async (req, res, next) => {
   const { bidId } = req.params;
-  const { gigId } = req.body; 
+  const { gigId } = req.body; // Needed to find the gig and lock it
 
   try {
-    // --- STEP 1: ATOMIC LOCK (The "Secure Logic Flow") ---
-    // We attempt to find the Gig and update it ONLY if status is 'Open'.
-    // This prevents Race Conditions. If it's already 'Assigned', this returns null.
+    // --- STEP 1: ATOMIC LOCK ---
+    // Only update if status is EXACTLY 'Open'. If it is 'Assigned', this fails.
     const gig = await Gig.findOneAndUpdate(
-      { _id: gigId, status: "Open" }, // Condition: MUST be Open
-      { $set: { status: "Assigned" } }, // Action: Change to Assigned
-      { new: true } // Return the updated doc
-    );
-
-    // If 'gig' is null, it means someone else hired a freelancer milliseconds ago
-    if (!gig) {
-      return res.status(400).json({ 
-        message: "Action Failed: This gig was just assigned to someone else!" 
-      });
-    }
-
-    // --- STEP 2: UPDATE BIDS ---
-    // Now that we secured the Gig, we safely update the bids
-    const winningBid = await Bid.findByIdAndUpdate(
-      bidId,
-      { status: 'hired' },
+      { _id: gigId, status: "Open" }, 
+      { $set: { status: "Assigned" } }, 
       { new: true }
     );
 
-    // Reject all other bids
-    await Bid.updateMany(
-      { gigId: gigId, _id: { $ne: bidId } }, 
-      { status: 'rejected' }
+    if (!gig) {
+      return res.status(400).json("This gig has already been assigned to someone else!");
+    }
+
+    // --- STEP 2: UPDATE BIDS ---
+    // Set the chosen bid to 'Hired'
+    const winningBid = await Bid.findByIdAndUpdate(
+      bidId,
+      { status: 'Hired' }, // Capitalized for consistency
+      { new: true }
     );
 
-    // --- STEP 3: REAL-TIME NOTIFICATION (Socket.io) ---
+    // Reject everyone else
+    await Bid.updateMany(
+      { gigId: gigId, _id: { $ne: bidId } }, 
+      { status: 'Rejected' }
+    );
+
+    // --- STEP 3: NOTIFICATION ---
+    // (Optional: Only works if socket is set up in server.js)
     const io = req.app.get('socketio');
     const onlineUsers = req.app.get('onlineUsers');
-
-    if (onlineUsers) {
-      // Find the freelancer in the online users list
+    
+    if (io && onlineUsers) {
       const freelancerSocket = onlineUsers.find(
         (user) => user.userId === winningBid.freelancerId.toString()
       );
-
       if (freelancerSocket) {
         io.to(freelancerSocket.socketId).emit("notification", {
           message: `Congrats! You have been hired for "${gig.title}"`,
@@ -95,21 +85,21 @@ const hireFreelancer = async (req, res) => {
         });
       }
     }
-    // -------------------------------------
 
     res.status(200).json({ message: "Freelancer hired successfully!", winningBid });
 
-  } catch (error) {
-    console.log(error);
-    // Ideally, we would rollback here, but for this assignment, we log the error.
-    res.status(500).json({ message: "Hiring failed", error: error.message });
+  } catch (err) {
+    next(err);
   }
 };
 
-// 3. GET BIDS FOR A GIG
+// 3. GET BIDS
 const getBids = async (req, res, next) => {
   try {
-    const bids = await Bid.find({ gigId: req.params.gigId }).populate("freelancerId", "name email");
+    // Populate adds the freelancer's name/email/img to the result
+    const bids = await Bid.find({ gigId: req.params.gigId })
+      .populate("freelancerId", "name email img"); 
+      
     res.status(200).json(bids);
   } catch (err) {
     next(err);

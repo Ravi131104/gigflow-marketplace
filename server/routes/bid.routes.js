@@ -1,17 +1,18 @@
 const express = require("express");
-const { verifyToken } = require("../middleware/verifyToken");
-// IMPORT MUST MATCH EXPORTS EXACTLY
-const { addBid, getBids, hireFreelancer } = require("../controllers/bidController");
+// FIX: Import from 'jwt.js' where we defined the verifyToken function earlier
+const { verifyToken } = require("../middleware/jwt"); 
+const { addBid, getBids, hireFreelancer } = require("../controllers/bid.controller");
 
 const router = express.Router();
 
-// Route to create a bid (Protected)
+// 1. Create a bid
 router.post("/", verifyToken, addBid);
 
-// Route to get all bids for a specific gig
+// 2. Get all bids for a specific gig
 router.get("/:gigId", verifyToken, getBids);
 
-// Route to hire a freelancer (Protected)
-router.patch("/:bidId/hire", verifyToken, hireFreelancer);
+// 3. Hire a freelancer
+// This matches the controller: expects 'bidId' in params
+router.put("/hire/:bidId", verifyToken, hireFreelancer); 
 
 module.exports = router;
