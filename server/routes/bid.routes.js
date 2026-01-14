@@ -13,6 +13,6 @@ router.get("/:gigId", verifyToken, getBids);
 
 // 3. Hire a freelancer
 // This matches the controller: expects 'bidId' in params
-router.put("/hire/:bidId", verifyToken, hireFreelancer); 
+router.put("/:bidId/hire", verifyToken, hireFreelancer); 
 
 module.exports = router;
