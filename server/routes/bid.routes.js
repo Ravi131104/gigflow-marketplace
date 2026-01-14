@@ -1,6 +1,6 @@
 const express = require("express");
 // FIX: Import from 'jwt.js' where we defined the verifyToken function earlier
-const { verifyToken } = require("../middleware/jwt"); 
+const { verifyToken } = require("../middleware/verifyToken"); 
 const { addBid, getBids, hireFreelancer } = require("../controllers/bid.controller");
 
 const router = express.Router();
